@@ -1,0 +1,90 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>PrabinKart — Home</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header class="site-header">
+    <div class="logo">PrabinKart</div>
+
+    <div class="search-wrap">
+      <input id="search-input" placeholder="Search for products, brands and more" />
+      <button id="search-btn">Search</button>
+    </div>
+
+    <div class="actions">
+      <button id="open-cart" class="btn">Cart (<span id="cart-count">0</span>)</button>
+      <button id="admin-mode" class="btn subtle">Admin</button>
+    </div>
+  </header>
+
+  <main class="container">
+    <aside class="left-col">
+      <div class="panel">
+        <h4>Categories</h4>
+        <div id="categories"></div>
+      </div>
+
+      <div class="panel">
+        <h4>Filters</h4>
+        <label>Max price ₹ <input id="price-filter" type="number" placeholder="e.g. 2000"></label>
+        <h4 style="margin-top:8px">Sort</h4>
+        <select id="sort-select">
+          <option value="new">Newest</option>
+          <option value="low">Price: Low to High</option>
+          <option value="high">Price: High to Low</option>
+          <option value="rating">Top Rated</option>
+        </select>
+      </div>
+
+      <div id="admin-panel" class="panel" style="display:none">
+        <h4>Admin — Add product</h4>
+        <input id="adm-title" placeholder="Title"><br>
+        <input id="adm-price" type="number" placeholder="Price"><br>
+        <textarea id="adm-desc" placeholder="Description"></textarea><br>
+        <input id="adm-photo" type="file" accept="image/*"><br>
+        <input id="adm-cat" placeholder="Category"><br>
+        <button id="adm-add" class="btn subtle">Add Product</button>
+      </div>
+    </aside>
+
+    <section class="main-col">
+      <div class="top-row">
+        <div><strong id="result-count">0</strong> results</div>
+        <div class="top-controls">
+          <select id="per-page">
+            <option value="6">6 / page</option>
+            <option value="9" selected>9 / page</option>
+            <option value="12">12 / page</option>
+          </select>
+        </div>
+      </div>
+
+      <div id="product-grid" class="grid"></div>
+
+      <div id="no-products" class="muted" style="display:none">No products found</div>
+
+      <div class="pagination" id="pagination"></div>
+    </section>
+  </main>
+
+  <div id="cart-drawer" class="cart-drawer">
+    <h3>Your cart</h3>
+    <div id="cart-items"></div>
+    <div class="cart-footer">
+      <strong>Total: ₹<span id="cart-total">0</span></strong>
+      <div>
+        <button id="checkout-btn" class="btn">Place Order (COD)</button>
+        <button id="close-cart" class="btn subtle">Close</button>
+      </div>
+    </div>
+  </div>
+
+  <footer class="footer">Demo multi-file store • Data stored in browser localStorage</footer>
+
+  <script src="app.js"></script>
+</body>
+</html>
