@@ -1,0 +1,294 @@
+// app.js — shared between index.html and product.html
+const ADMIN_PASS = 'admin123';
+
+// Read storage
+let products = JSON.parse(localStorage.getItem('multi_products')||'[]');
+let cart = JSON.parse(localStorage.getItem('multi_cart')||'[]');
+
+function uid(len=8){return Math.random().toString(36).slice(2,2+len);}
+function save(){ localStorage.setItem('multi_products', JSON.stringify(products)); localStorage.setItem('multi_cart', JSON.stringify(cart)); }
+
+function ensureDemo(){
+  if(products.length===0){
+    products = [
+      {id:uid(), title:'Men Cotton T-Shirt', price:499, description:'Comfort cotton tee', photo:'https://placehold.co/600x400?text=T-shirt', category:'Clothing', created:Date.now(), reviews:[]},
+      {id:uid(), title:'Wireless Earbuds', price:1499, description:'Bluetooth earphones', photo:'https://placehold.co/600x400?text=Earbuds', category:'Electronics', created:Date.now(), reviews:[]},
+      {id:uid(), title:'Travel Backpack', price:899, description:'Durable travel backpack', photo:'https://placehold.co/600x400?text=Backpack', category:'Bags', created:Date.now(), reviews:[]},
+      // add more sample items to show pagination
+    ];
+    // add more demo items for pagination
+    for(let i=1;i<=9;i++){
+      products.push({id:uid(), title:`Demo Product ${i}`, price:150+i*50, description:`Demo product number ${i}`, photo:`https://placehold.co/600x400?text=Item+${i}`, category:i%2? 'Category A':'Category B', created:Date.now()-i*1000, reviews:[]});
+    }
+    save();
+  }
+}
+
+// Utility: escape text
+function esc(s){return (s||'').replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;');}
+
+// ========== INDEX PAGE LOGIC ==========
+function renderCategories(){
+  const node = document.getElementById('categories');
+  if(!node) return;
+  node.innerHTML = '';
+  const cats = [...new Set(products.map(p=>p.category||'General'))];
+  if(cats.length===0){ node.innerHTML = '<div class="muted">No categories</div>'; return; }
+  cats.forEach(c=>{
+    const d = document.createElement('div');
+    d.className = 'category';
+    d.textContent = c;
+    d.onclick = ()=>{ document.querySelectorAll('.category').forEach(x=>x.classList.remove('active')); d.classList.add('active'); applyFilters(); };
+    node.appendChild(d);
+  });
+}
+
+function avgRating(p){
+  if(!p.reviews || p.reviews.length===0) return 0;
+  return p.reviews.reduce((s,r)=>s+r.rating,0)/p.reviews.length;
+}
+
+// Pagination state
+let currentPage = 1;
+let perPage = 9;
+
+function renderProductsPage(list){
+  const grid = document.getElementById('product-grid');
+  if(!grid) return;
+  const total = list.length;
+  const pages = Math.max(1, Math.ceil(total / perPage));
+  if(currentPage > pages) currentPage = pages;
+  const start = (currentPage-1)*perPage;
+  const pageItems = list.slice(start, start+perPage);
+
+  grid.innerHTML = '';
+  pageItems.forEach(p=>{
+    const el = document.createElement('div');
+    el.className = 'card';
+    el.innerHTML = `<img src="${p.photo}" alt=""><h3>${esc(p.title)}</h3><div style="display:flex;justify-content:space-between;align-items:center"><div><div class="price">₹${p.price}</div><div class="rating">${'★'.repeat(Math.round(avgRating(p))) + '☆'.repeat(5-Math.round(avgRating(p)))} ${p.reviews?.length? '('+p.reviews.length+')':''}</div></div><div><button class="btn subtle" onclick="viewProductPage('${p.id}')">View</button> <button class="btn" onclick="addToCart('${p.id}')">Add</button></div></div>`;
+    grid.appendChild(el);
+  });
+
+  document.getElementById('result-count').textContent = total;
+  renderPagination(total, pages);
+}
+
+function renderPagination(total, pages){
+  const el = document.getElementById('pagination');
+  if(!el) return;
+  el.innerHTML = '';
+  if(pages<=1) return;
+  for(let i=1;i<=pages;i++){
+    const b = document.createElement('button');
+    b.className = 'page-btn' + (i===currentPage? ' active':'');
+    b.textContent = i;
+    b.onclick = ()=>{ currentPage = i; applyFilters(); window.scrollTo({top:120,behavior:'smooth'}); };
+    el.appendChild(b);
+  }
+}
+
+// Filters + sort
+function applyFilters(){
+  let list = [...products];
+  const q = (document.getElementById('search-input')?.value||'').trim().toLowerCase();
+  if(q) list = list.filter(p=>p.title.toLowerCase().includes(q) || p.description.toLowerCase().includes(q));
+  const price = parseFloat(document.getElementById('price-filter')?.value||0);
+  if(price>0) list = list.filter(p=>parseFloat(p.price)<=price);
+  const active = document.querySelector('.category.active');
+  if(active) list = list.filter(p=>p.category===active.textContent);
+  const sort = document.getElementById('sort-select')?.value || 'new';
+  if(sort==='low') list.sort((a,b)=>a.price-b.price);
+  if(sort==='high') list.sort((a,b)=>b.price-a.price);
+  if(sort==='rating') list.sort((a,b)=>avgRating(b)-avgRating(a));
+  if(sort==='new') list.sort((a,b)=> (b.created||0)-(a.created||0));
+  perPage = parseInt(document.getElementById('per-page')?.value || 9);
+  renderProductsPage(list);
+}
+
+// Cart functions (shared)
+function updateCartUI(){
+  const count = cart.reduce((s,i)=>s+i.qty,0);
+  document.querySelectorAll('#cart-count').forEach(n=>n.textContent = count);
+  const listEl = document.getElementById('cart-items');
+  if(listEl){
+    listEl.innerHTML = '';
+    let total=0;
+    cart.forEach(ci=>{
+      const p = products.find(x=>x.id===ci.id);
+      if(!p) return;
+      const d = document.createElement('div'); d.className='cart-item';
+      d.innerHTML = `<img src="${p.photo}"><div style="flex:1"><strong>${esc(p.title)}</strong><div class="muted">₹${p.price} • Qty: ${ci.qty}</div></div><div><div>₹${p.qty * p.price}</div><div style="margin-top:6px"><button class="btn subtle" onclick="changeQty('${ci.id}','-')">-</button> <button class="btn" onclick="changeQty('${ci.id}','+')">+</button></div></div>`;
+      listEl.appendChild(d);
+      total += p.price * ci.qty;
+    });
+    const totalEl = document.getElementById('cart-total');
+    if(totalEl) totalEl.textContent = total;
+  }
+  save();
+}
+
+function addToCart(id){
+  const ex = cart.find(c=>c.id===id);
+  if(ex) ex.qty++;
+  else cart.push({id, qty:1});
+  updateCartUI();
+  alert('Added to cart');
+}
+
+function changeQty(id, op){
+  const idx = cart.findIndex(c=>c.id===id);
+  if(idx<0) return;
+  if(op === '+') cart[idx].qty++;
+  else { cart[idx].qty--; if(cart[idx].qty<=0) cart.splice(idx,1); }
+  updateCartUI();
+}
+
+// Checkout (COD)
+function checkout(){
+  if(cart.length===0) return alert('Cart empty');
+  const name = prompt('Your name for order'); if(!name) return;
+  const phone = prompt('Phone number'); if(!phone) return;
+  const address = prompt('Delivery address'); if(!address) return;
+  const order = {
+    id: 'ORD-'+uid(6).toUpperCase(),
+    name, phone, address,
+    items: cart.map(ci=>{
+      const p = products.find(x=>x.id===ci.id);
+      return {id:ci.id, title: p?.title||'Product', price: p?.price||0, qty:ci.qty};
+    }),
+    total: cart.reduce((s,ci)=>{ const p=products.find(x=>x.id===ci.id); return s + (p?p.price*ci.qty:0);},0),
+    method:'COD', created:Date.now()
+  };
+  const all = JSON.parse(localStorage.getItem('multi_orders')||'[]');
+  all.unshift(order);
+  localStorage.setItem('multi_orders', JSON.stringify(all));
+  cart = [];
+  save();
+  updateCartUI();
+  alert('Order placed. ID: ' + order.id + '\nPay on delivery');
+}
+
+// Admin
+let isAdmin = false;
+function enableAdmin(){
+  const p = prompt('Enter admin password');
+  if(p === ADMIN_PASS){ isAdmin=true; document.getElementById('admin-panel').style.display='block'; alert('Admin enabled'); }
+  else alert('Wrong password');
+}
+async function addAdminProduct(){
+  const title = document.getElementById('adm-title').value.trim();
+  const price = parseFloat(document.getElementById('adm-price').value);
+  const desc = document.getElementById('adm-desc').value.trim();
+  const file = document.getElementById('adm-photo').files[0];
+  const cat = document.getElementById('adm-cat').value.trim() || 'General';
+  if(!title || !price || !file) return alert('Add title, price and photo');
+  const data = await fileToDataUrl(file);
+  const p = { id: uid(), title, price, description: desc, photo: data, category: cat, created: Date.now(), reviews: [] };
+  products.unshift(p);
+  save();
+  renderCategories();
+  applyFilters();
+  // clear
+  document.getElementById('adm-title').value=''; document.getElementById('adm-price').value=''; document.getElementById('adm-desc').value=''; document.getElementById('adm-photo').value=''; document.getElementById('adm-cat').value='';
+  alert('Product added');
+}
+function fileToDataUrl(file){ return new Promise((res,rej)=>{ const r=new FileReader(); r.onload = ()=>res(r.result); r.onerror = ()=>rej(); r.readAsDataURL(file); }); }
+
+// Product page view (navigate to product.html?id=...)
+function viewProductPage(id){
+  location.href = 'product.html?id=' + encodeURIComponent(id);
+}
+function showProductFromQuery(){
+  // only runs on product.html
+  const param = new URLSearchParams(location.search);
+  const id = param.get('id');
+  const target = document.getElementById('product-area');
+  if(!target){ return; }
+  const p = products.find(x=>x.id===id);
+  if(!p){ target.innerHTML = '<p class="muted">Product not found</p>'; return; }
+  target.innerHTML = `<div style="display:flex;gap:18px;flex-wrap:wrap"><div style="flex:1 1 320px"><img src="${p.photo}" style="width:100%;height:420px;object-fit:cover;border-radius:8px"></div><div style="flex:1 1 320px"><h2>${esc(p.title)}</h2><div class="price">₹${p.price}</div><p class="muted">${esc(p.description)}</p><div style="margin-top:12px"><button class="btn" onclick="addToCartAndStay('${p.id}')">Add to Cart</button> <button class="btn subtle" onclick="location.href='index.html'">Back</button></div><hr><h4>Reviews</h4><div id="prod-rv"></div><h4>Add Review</h4><input id="rv-name" placeholder="Name"><br><input id="rv-rating" type="number" min="1" max="5" value="5"><br><textarea id="rv-comment" placeholder="Comment"></textarea><br><button class="btn" id="rv-submit">Submit</button></div></div>`;
+  renderProductReviews(p);
+  document.getElementById('rv-submit').addEventListener('click',()=>{
+    const name = document.getElementById('rv-name').value || 'Anonymous';
+    const rating = parseInt(document.getElementById('rv-rating').value) || 5;
+    const comment = document.getElementById('rv-comment').value || '';
+    p.reviews = p.reviews||[];
+    p.reviews.push({name, rating, comment});
+    save();
+    renderProductReviews(p);
+    alert('Review added');
+  });
+}
+function renderProductReviews(p){
+  const area = document.getElementById('prod-rv');
+  if(!area) return;
+  area.innerHTML = '';
+  if(!p.reviews || p.reviews.length===0) area.innerHTML = '<div class="muted">No reviews yet</div>';
+  else p.reviews.slice().reverse().forEach(r=>{
+    const d = document.createElement('div'); d.style.padding = '8px 0';
+    d.innerHTML = `<strong>${esc(r.name)}</strong><div style="color:#ffb400">${'★'.repeat(r.rating)}${'☆'.repeat(5-r.rating)}</div><div class="muted" style="font-size:13px">${esc(r.comment)}</div>`;
+    area.appendChild(d);
+  });
+}
+
+// helper used by product page Add to Cart
+function addToCartAndStay(id){
+  addToCart(id);
+  updateCartUI();
+}
+
+// Toggle cart drawer (shared)
+function bindCartButtons(){
+  document.querySelectorAll('#open-cart').forEach(b=>{
+    b.addEventListener('click', ()=>{
+      const drawer = document.getElementById('cart-drawer');
+      if(!drawer) return;
+      drawer.style.display = drawer.style.display === 'block' ? 'none' : 'block';
+    });
+  });
+  document.querySelectorAll('#close-cart').forEach(b=>{
+    b.addEventListener('click', ()=>{
+      const drawer = document.getElementById('cart-drawer');
+      if(drawer) drawer.style.display = 'none';
+    });
+  });
+  document.querySelectorAll('#checkout-btn').forEach(b=>{
+    b.addEventListener('click', checkout);
+  });
+}
+
+// Init function for index.html
+function initIndex(){
+  ensureDemo();
+  renderCategories();
+  applyFilters();
+  updateCartUI();
+  bindCartButtons();
+
+  document.getElementById('search-btn')?.addEventListener('click', ()=>{ currentPage = 1; applyFilters();});
+  document.getElementById('search-input')?.addEventListener('input', ()=>{ currentPage = 1; applyFilters();});
+  document.getElementById('price-filter')?.addEventListener('input', ()=>{ currentPage = 1; applyFilters();});
+  document.getElementById('sort-select')?.addEventListener('change', ()=>{ currentPage = 1; applyFilters();});
+  document.getElementById('per-page')?.addEventListener('change', ()=>{ currentPage = 1; applyFilters();});
+
+  document.getElementById('admin-mode')?.addEventListener('click', enableAdmin);
+  document.getElementById('adm-add')?.addEventListener('click', addAdminProduct);
+}
+
+// Generic boot (works for both pages)
+document.addEventListener('DOMContentLoaded', ()=>{
+  try{
+    if(document.getElementById('product-grid')) initIndex(); // index.html
+    bindCartButtons();
+    updateCartUI();
+  }catch(e){ console.error(e); }
+});
+
+// expose functions used by product.html
+window.viewProductPage = viewProductPage;
+window.showProductFromQuery = showProductFromQuery;
+window.addToCart = addToCart;
+window.updateCartUI = updateCartUI;
+window.checkout = checkout;
+window.enableAdmin = enableAdmin;
+window.addAdminProduct = addAdminProduct;
