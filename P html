@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Product — PrabinKart</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header class="site-header">
+    <div class="logo"><a href="index.html" style="color:inherit;text-decoration:none;">PrabinKart</a></div>
+    <div class="actions">
+      <button id="open-cart" class="btn">Cart (<span id="cart-count">0</span>)</button>
+      <button onclick="location.href='index.html'" class="btn subtle">Home</button>
+    </div>
+  </header>
+
+  <main class="container single-product" id="product-area">
+    <!-- JS will render the product here -->
+  </main>
+
+  <div id="cart-drawer" class="cart-drawer">
+    <h3>Your cart</h3>
+    <div id="cart-items"></div>
+    <div class="cart-footer">
+      <strong>Total: ₹<span id="cart-total">0</span></strong>
+      <div>
+        <button id="checkout-btn" class="btn">Place Order (COD)</button>
+        <button id="close-cart" class="btn subtle">Close</button>
+      </div>
+    </div>
+  </div>
+
+  <footer class="footer">Product page • Demo</footer>
+
+  <script src="app.js"></script>
+  <script>
+    // app.js exposes showProductFromQuery()
+    if (typeof showProductFromQuery === 'function') {
+      showProductFromQuery();
+    } else {
+      document.getElementById('product-area').innerHTML = '<p class="muted">Product script not loaded.</p>';
+    }
+  </script>
+</body>
+</html>
